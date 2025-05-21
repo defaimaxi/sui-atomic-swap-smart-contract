@@ -25,7 +25,7 @@ const ELockKeyMistmach: u64 = 0;
 public fun lock<T: key + store>(obj: T, ctx: &mut TxContext): (Locked<T>, Key) {
     let key = Key { id: object::new(ctx) };
 
-    let mut lock = Locked {
+    let mut lock:Locked<T> = Locked {
         id: object::new(ctx),
         key: object::id(&key),
     };
@@ -37,9 +37,9 @@ public fun lock<T: key + store>(obj: T, ctx: &mut TxContext): (Locked<T>, Key) {
         item_id: object::id(&obj),
     });
 
-    dof::add(&mut lock_id, LockedObjectKey {}, obj);
+    dof::add(&mut lock.id, LockedObjectKey {}, obj);
 
-    (lock, obj)
+    (lock, key)
 }
 
 public fun unlock<T: key + store>(mut locked: Locked<T>, key: Key): T {
@@ -48,18 +48,18 @@ public fun unlock<T: key + store>(mut locked: Locked<T>, key: Key): T {
     let Key { id } = key;
     id.delete();
 
-    let obj = dof::remove<LockedObjectKey, T>(&mut lock_id, LockedObjectKey {});
+    let obj = dof::remove<LockedObjectKey, T>(&mut locked.id, LockedObjectKey {});
 
     event::emit(LockDestroyed {
         lock_id: object::id(&locked),
     });
 
-    let Locked { id, Key: _ } = locked;
+    let Locked { id, key: _ } = locked;
     id.delete();
     obj
 }
 
-public struct LockedCreated has copy, drop {
+public struct LockCreated has copy, drop {
     lock_id: ID,
     key_id: ID,
     creator: address,
@@ -95,7 +95,7 @@ fun test_lock_unlock() {
 }
 
 #[test]
-#[expected_failure(abort_code = ELockKeyMismatch)]
+#[expected_failure(abort_code = ELockKeyMistmach)]
 fun test_lock_key_mismatch() {
     let mut ts = ts::begin(@0xA);
     let coin = test_coin(&mut ts);
