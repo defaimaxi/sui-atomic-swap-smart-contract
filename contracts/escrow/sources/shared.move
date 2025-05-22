@@ -6,7 +6,7 @@ use sui::event;
 
 public struct EscrowedObjectKey has copy, drop, store {}
 
-public struct Escrow has key, store {
+public struct Escrow<phantom T: key + store> has key, store {
     id: UID,
     sender: address,
     recipient: address,
@@ -22,11 +22,11 @@ public struct EscrowCreated has copy, drop {
 }
 
 public struct EscrowSwapped has copy, drop {
-    escrowe_id: ID,
+    escrow_id: ID,
 }
 
 public struct EscrowedCancelled has copy, drop {
-    escrowe_id: ID,
+    escrow_id: ID,
 }
 
 const EMismatchedSenderRecipient: u64 = 0;
@@ -36,7 +36,7 @@ public fun create<T: key + store>(
     escrowed: T,
     exchange_key: ID,
     recipient: address,
-    ctx: &mut address,
+    ctx: &mut TxContext,
 ) {
     let mut escrow = Escrow<T> {
         id: object::new(ctx),
@@ -45,17 +45,30 @@ public fun create<T: key + store>(
         exchange_key,
     };
 
-    event::emit {
+    event::emit(EsrowCreated {
         escrow_id: object::id(&escrow),
         key_id: exchange_key,
-        sender: escorw.sender,
+        sender: escrow.sender,
         recipient,
-        item_id: object::id(&objected),
-    };
+        item_id: object::id(&escrowed),
+    });
 
     dof::add(&mut escrow_id, EscrowedObjectKey {}, escrowed);
 
     transfer::public_share_object(escrow);
+}
+
+public fun return_to_sender<T: key + store>(mut escrow: Escrow<T>, ctx: &TxContext): T {
+    event::emit(EscrowedCancelled {
+        escrow_id: object::id(&escrow),
+    });
+
+
+
+    
+
+
+
 }
 
 public fun swap<T: key + store, U: key + store>(
@@ -64,7 +77,7 @@ public fun swap<T: key + store, U: key + store>(
     locked: Locked<U>,
     ctx: &TxContext,
 ): T {
-    let escrowed = dof::remove<EscrowedObjectKey, T>(&mut escorw.id, EscrowedObjectKey {});
+    let escrowed = dof::remove<EscrowedObjectKey, T>(&mut escrow.id, EscrowedObjectKey {});
 
     let Escrow {
         id,
